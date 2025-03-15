@@ -2,6 +2,8 @@
 # Example Python script for exchange data with STM32F407 microcontroller
 
 Пример кода взаимодействия программы на python с контроллером STM32F407 через com port.
+- ```Python/main.py``` - Скрипт чтения из контроллера и запись в файл ```BMP280_pressure.csv```
+- ```Python/chart.py``` - строит график по содержимому в ```BMP280_pressure.csv```, автообновление графика по свежим данным.
 
 ## Как установить и запустить
 ### Clone repo
@@ -26,6 +28,7 @@ python -m pip install -U -r requirements.txt
 
 # Run
 python main.py
+python chart.py
 ```
 
 ### Если установлен пакетный менеджер UV
