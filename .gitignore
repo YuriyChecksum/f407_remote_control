@@ -170,3 +170,5 @@ cython_debug/
 #.idea/
 
 *.csv
+.idea
+.vscode
