@@ -54,105 +54,104 @@ import time
 from contextlib import contextmanager
 import logging
 
-import serial.serialwin32
-import serial.win32
-
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
 
+
 class Serial:
-  _handl: serial.Serial | None = None  # дескриптор порта
-  port = 'loop://'  # по умолчанию будет loopback
-  # port = '\\\\.\\COM3'
-  timeout = 1
-  baudrate = 115200
+    _handl: serial.Serial | None = None  # дескриптор порта
+    port = 'loop://'  # по умолчанию будет loopback
+    # port = '\\\\.\\COM3'
+    timeout = 1
+    baudrate = 115200
 
-  @classmethod
-  @contextmanager
-  def connect(cls, port: str='loop://', baudrate: int=115200, timeout=1):
-      cls.port = port
-      cls.baudrate = baudrate
-      cls.timeout = timeout
-      cls.init_serial()
-      cls.reset_input_buffer()
-      try:
-          yield cls._handl
-      finally:
-          cls.close()
-          
-  @classmethod
-  def init_serial(cls): # первичная инициализация порта
-    # assert cls.ser == None
-    if cls._handl == None: # первичная инициализация порта
-      try:
+    @classmethod
+    @contextmanager
+    def connect(cls, port: str = 'loop://', baudrate: int = 115200, timeout=1):
+        cls.port = port
+        cls.baudrate = baudrate
+        cls.timeout = timeout
+        cls.init_serial()
+        cls.reset_input_buffer()
+        try:
+            yield cls._handl
+        finally:
+            cls.close()
+
+    @classmethod
+    def init_serial(cls):  # первичная инициализация порта
+        # assert cls.ser == None
+        if cls._handl == None:  # первичная инициализация порта
+            try:
+                if cls.port == 'loop://':
+                    cls._handl = serial.serial_for_url('loop://', timeout=cls.timeout)
+                else:
+                    cls._handl = serial.Serial(cls.port, baudrate=cls.baudrate, timeout=cls.timeout)
+                # print(f'Open serial port: {cls.ser.name}')
+            except:
+                raise ConnectionError(f'Can\'t open serial port: {cls.port}, class: \'{cls.__name__}\'')
+        if not cls._handl.is_open:  # может быть закрытым из-за autoclose
+            try:
+                cls._handl.open()
+            except:
+                raise ConnectionError(f'Can\'t reopen serial port: {cls.port}, class: \'{cls.__name__}\'')
+
+    @classmethod
+    def send(cls, mess: bytes, autoclose=False):
+        if mess == None or mess == '': return
+        # тут вставить блок try:  except:
+        cls.init_serial()
+        cls._handl.write(mess)
+        # чтобы не зависал от переполнения буферов при тесте через 'loop://'
         if cls.port == 'loop://':
-          cls._handl = serial.serial_for_url('loop://', timeout=cls.timeout)
-        else:
-          cls._handl = serial.Serial(cls.port, baudrate=cls.baudrate, timeout=cls.timeout)
-        # print(f'Open serial port: {cls.ser.name}')
-      except:
-        raise ConnectionError(f'Can\'t open serial port: {cls.port}, class: \'{cls.__name__}\'')
-    if not cls._handl.is_open: # может быть закрытым из-за autoclose
-      try:
-        cls._handl.open()
-      except: 
-        raise ConnectionError(f'Can\'t reopen serial port: {cls.port}, class: \'{cls.__name__}\'')
-    
-  @classmethod
-  def send(cls, mess: bytes, autoclose=False):
-    if mess == None or mess == '': return
-    # тут вставить блок try:  except: 
-    cls.init_serial()
-    cls._handl.write(mess)
-    # чтобы не зависал от переполнения буферов при тесте через 'loop://'
-    if cls.port == 'loop://':
-      cls._handl.flushOutput()
-      #cls.ser.reset_output_buffer()
-      #cls.ser.reset_input_buffer()
-    if autoclose:
-      cls._handl.close()
-  
-  @classmethod
-  def read(cls) -> bytes | None:
-    try:
-      cls.init_serial()
-      if Serial._handl.in_waiting > 0:
-        return Serial._handl.read_all()
-    except:
-      raise ConnectionError(f'Can\'t read serial port: {cls.port}, class: \'{cls.__name__}\'')
+            cls._handl.flushOutput()
+            # cls.ser.reset_output_buffer()
+            # cls.ser.reset_input_buffer()
+        if autoclose:
+            cls._handl.close()
 
-  @classmethod
-  def read_line(cls) -> bytes | None:
-    try:
-      cls.init_serial()
-      if Serial._handl.in_waiting > 0:
-        return Serial._handl.readline()
-    except:
-      raise ConnectionError(f'Can\'t read serial port: {cls.port}, class: \'{cls.__name__}\'')
-  
-  @classmethod
-  def reset_input_buffer(cls):
-    if cls._handl != None: 
-      cls._handl.reset_input_buffer()
-  
-  @classmethod
-  def reset(cls):  # from stm32loader.py
-    cls._handl.setDTR(0)
-    time.sleep(0.1)
-    cls._handl.setDTR(1)
-    time.sleep(0.5)
-    
-  @classmethod
-  def is_open(cls) -> bool:
-    return cls._handl != None and cls._handl.is_open
-  
-  @classmethod
-  def close(cls):
-    if cls._handl != None and cls._handl.is_open:
-      try:
-        cls._handl.close()
-      except: 
-        raise ConnectionError(f'Can\'t close serial port: {cls.port}')
+    @classmethod
+    def read(cls) -> bytes | None:
+        try:
+            cls.init_serial()
+            if Serial._handl.in_waiting > 0:
+                return Serial._handl.read_all()
+        except:
+            raise ConnectionError(f'Can\'t read serial port: {cls.port}, class: \'{cls.__name__}\'')
+
+    @classmethod
+    def read_line(cls) -> bytes | None:
+        try:
+            cls.init_serial()
+            if Serial._handl.in_waiting > 0:
+                return Serial._handl.readline()
+        except:
+            raise ConnectionError(f'Can\'t read serial port: {cls.port}, class: \'{cls.__name__}\'')
+
+    @classmethod
+    def reset_input_buffer(cls):
+        if cls._handl != None:
+            cls._handl.reset_input_buffer()
+
+    @classmethod
+    def reset(cls):  # from stm32loader.py
+        cls._handl.setDTR(0)
+        time.sleep(0.1)
+        cls._handl.setDTR(1)
+        time.sleep(0.5)
+
+    @classmethod
+    def is_open(cls) -> bool:
+        return cls._handl != None and cls._handl.is_open
+
+    @classmethod
+    def close(cls):
+        if cls._handl != None and cls._handl.is_open:
+            try:
+                cls._handl.close()
+            except:
+                raise ConnectionError(f'Can\'t close serial port: {cls.port}')
+
 
 if __name__ == "__main__":
-  pass
+    pass

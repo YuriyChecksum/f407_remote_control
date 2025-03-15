@@ -3,8 +3,8 @@
 import time
 import logging
 from src.serial import Serial
-import src.crc as CRC
-import src.keyboard_hook as KB
+import src.keyboard_hook as kb
+# import src.crc as CRC
 from src.file_io import read_dump, save_dump, write_log
 
 # https://docs.python.org/3/library/logging.html#logrecord-attributes
@@ -19,16 +19,17 @@ log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
 log.info("Starting app...")
 
+
 class BMP280:
-    debug = False # показать отладочную информацию
+    debug = False  # показать отладочную информацию
     filehandler = None
     start_time = 0
-    mmHg = 101325/760 # 101325/760 ≈ 133,322 Па. константа мм. рт. ст в паскали
+    mmHg = 101325 / 760  # 101325/760 ≈ 133,322 Па. константа мм. рт. ст в паскали
     last_pressureIIR = 0
-    K_IIR = 0.02 # coeff for IIR LF  сгладим кривую фильтром
+    K_IIR = 0.02  # coeff for IIR LF  сгладим кривую фильтром
 
     @classmethod
-    def send(cls, str: str='') -> None:
+    def send(cls, str: str = '') -> None:
         if cls.debug:
             log.debug('send: %s', str)
         Serial.send(f'{str}\n'.encode())
@@ -43,17 +44,17 @@ class BMP280:
 
     @classmethod
     def init_sensor(cls) -> None:
-        #отключает вывод данных АЦП
+        # отключает вывод данных АЦП
         cls.send(f'q')
         time.sleep(0.05)
 
-        #период опроса в мс в десятичной системе
+        # период опроса в мс в десятичной системе
         cls.send(f'task bmp280 t 2000 ')
         time.sleep(0.05)
 
-        #старт/стоп
-        #cls.send(f'task bmp280 p ') # pause
-        #time.sleep(0.05)
+        # старт/стоп
+        # cls.send(f'task bmp280 p ') # pause
+        # time.sleep(0.05)
 
         log.info('Send init parameters: 0xF4 = 0x53, 0xF5 = 0x30')
         # ещё вариант: i2c 76 w 1 00f4 0001 27
@@ -76,42 +77,44 @@ class BMP280:
 
             parameters = line.split(";")
             try:
-              # Парсим каждый параметр
-              for param in parameters:
-                  if param.strip():  # Проверка, что строка не пустая
-                      key, value = param.split(":")
-                      parsed_data[key.strip()] = float(value.strip())
+                # Парсим каждый параметр
+                for param in parameters:
+                    if param.strip():  # Проверка, что строка не пустая
+                        key, value = param.split(":")
+                        parsed_data[key.strip()] = float(value.strip())
             except KeyboardInterrupt as err:
                 log.error(err, line)
 
             # pressure: 851393, 851433, min
-            #lines = line.strip().removeprefix('pressure:').split(',')
-            #pressureLF = int(lines[1]) # после ФНЧ  val = val*(1-K) + res*K; // K = 0.02
+            # lines = line.strip().removeprefix('pressure:').split(',')
+            # pressureLF = int(lines[1]) # после ФНЧ  val = val*(1-K) + res*K; // K = 0.02
             # log.info(f'pressure: {pressure: 8d}, ФНЧ:{pressureLF: 8d}, {pressure: 024b}{mm}')
-            temperature       = parsed_data['T']
-            pressure          = parsed_data['P1']
-            pressure_mm       = parsed_data['P2']
-            humidity_ATH25    = parsed_data['H']
+            temperature = parsed_data['T']
+            pressure = parsed_data['P1']
+            pressure_mm = parsed_data['P2']
+            humidity_ATH25 = parsed_data['H']
             temperature_ATH25 = parsed_data['T2']
 
-            #K_IIR = 0.02
-            pressureIIR = pressure * (1 - cls.K_IIR) + cls.last_pressureIIR * cls.K_IIR   # IIR ФНЧ val = val*(1-K) + res*K; K = 0.02
+            # K_IIR = 0.02
+            pressureIIR = pressure * (
+                        1 - cls.K_IIR) + cls.last_pressureIIR * cls.K_IIR  # IIR ФНЧ val = val*(1-K) + res*K; K = 0.02
             cls.last_pressureIIR = pressureIIR
 
             # sTime = time.strftime('%X', time.localtime()) # '%Y.%m.%d %X'  f'{time.monotonic():11.3f}'
             sTime = time.strftime('%Y-%m-%d %X', time.localtime())
-            sTimeLog = sTime   #sTimeLog = f'{time.monotonic() - cls.start_time:11.3f}'
+            sTimeLog = sTime  # sTimeLog = f'{time.monotonic() - cls.start_time:11.3f}'
             log.info(
-                f'{temperature: 2.2f} C, {pressure: 10.2f} Pa, {pressureIIR: 10.2f} Pa IIR, {pressure/cls.mmHg:3.6f} mmhg, {humidity_ATH25: 2.2f} %, {temperature_ATH25: 2.2f} C')
-            
+                f'{temperature: 2.2f} C, {pressure: 10.2f} Pa, {pressureIIR: 10.2f} Pa IIR, {pressure / cls.mmHg:3.6f} mmhg, {humidity_ATH25: 2.2f} %, {temperature_ATH25: 2.2f} C')
+
             if cls.filehandler is not None:
                 cls.filehandler.write(
-                    f'{sTimeLog}; {temperature:2.2f}; {pressure:10.2f}; {pressureIIR:10.2f}; {pressure/cls.mmHg:3.6f}; {humidity_ATH25: 2.2f}; {temperature_ATH25: 2.2f};\n'.replace('.',','))
+                    f'{sTimeLog}; {temperature:2.2f}; {pressure:10.2f}; {pressureIIR:10.2f}; {pressure / cls.mmHg:3.6f}; {humidity_ATH25: 2.2f}; {temperature_ATH25: 2.2f};\n'.replace(
+                        '.', ','))
                 cls.filehandler.flush()
 
-        except ConnectionError as err: # Can\'t open serial port
+        except ConnectionError as err:  # Can\'t open serial port
             log.exception(err)
-        except KeyboardInterrupt as err: # Exception('Exit by hook Esc')
+        except KeyboardInterrupt as err:  # Exception('Exit by hook Esc')
             log.error(err)
 
     @classmethod
@@ -120,8 +123,8 @@ class BMP280:
         cls.init_sensor()
         Serial.reset_input_buffer()
         if cls.filehandler:
-          cls.filehandler.close()
-          cls.filehandler = None
+            cls.filehandler.close()
+            cls.filehandler = None
 
         cls.start_time = time.monotonic()
 
@@ -129,11 +132,12 @@ class BMP280:
             with open(filename, 'a+') as f:
                 cls.filehandler = f
                 # loop чтения из буфера порта
-                KB.timeloop(lambda: cls.read_data(), 60*60*24*10, 1)
+                kb.timeloop(lambda: cls.read_data(), 60 * 60 * 24 * 10, 1)
                 # освобождаем хэндл
                 cls.filehandler = None
         else:
-            KB.timeloop(lambda: cls.read_data(), 60*60*24*10, 1)
+            kb.timeloop(lambda: cls.read_data(), 60 * 60 * 24 * 10, 1)
+
 
 def main():
     try:
@@ -142,16 +146,17 @@ def main():
             log.info('Serial port %s, baudrate %s', conn.port, conn.baudrate)
             # Serial.read_line()
             # хуки для прерывания кода по Esc, или для управления параметрами через клавиши
-            KB.hook_default()
+            kb.hook_default()
             BMP280.start_loop_read_pressure_to_file('BMP280_pressure.csv')
-            KB.unhook()
-    except ConnectionError as err: # Can\'t open serial port
+            kb.unhook()
+    except ConnectionError as err:  # Can\'t open serial port
         log.error(err)
         input('press Enter for exit...')
-    except KeyboardInterrupt as err: # Exception('Exit by hook Esc')
+    except KeyboardInterrupt as err:  # Exception('Exit by hook Esc')
         log.error(err)
     except Exception as err:
         log.exception(err)
+
 
 if __name__ == "__main__":
     main()

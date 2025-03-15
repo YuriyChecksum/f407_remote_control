@@ -1,3 +1,5 @@
+"""Строит графики по данным из 'BMP280_pressure.csv'"""
+
 import logging
 from pathlib import Path
 import time
