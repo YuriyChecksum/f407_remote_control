@@ -82,7 +82,7 @@ class BMP280:
                       key, value = param.split(":")
                       parsed_data[key.strip()] = float(value.strip())
             except KeyboardInterrupt as err:
-                log.info(err, line)
+                log.error(err, line)
 
             # pressure: 851393, 851433, min
             #lines = line.strip().removeprefix('pressure:').split(',')
@@ -112,7 +112,7 @@ class BMP280:
         except ConnectionError as err: # Can\'t open serial port
             log.exception(err)
         except KeyboardInterrupt as err: # Exception('Exit by hook Esc')
-            log.info(err)
+            log.error(err)
 
     @classmethod
     def start_loop_read_pressure_to_file(cls, filename: str | None = None) -> None:
@@ -146,10 +146,10 @@ def main():
             BMP280.start_loop_read_pressure_to_file('BMP280_pressure.csv')
             KB.unhook()
     except ConnectionError as err: # Can\'t open serial port
-        log.exception(err)
+        log.error(err)
         input('press Enter for exit...')
     except KeyboardInterrupt as err: # Exception('Exit by hook Esc')
-        log.info(err)
+        log.error(err)
     except Exception as err:
         log.exception(err)
 
