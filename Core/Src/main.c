@@ -798,6 +798,7 @@ void step (int steps, uint8_t direction, uint16_t delay)
 step(800, 1, 5000); */
 
 /*----------------------------------------------------------------------------*/
+// простой пинг в терминал, что работаем и не зависли
 void task1() {
 	printf("_Worked: %.3f sec\r\n", HAL_GetTick()/1000.0f);
 }
@@ -807,8 +808,8 @@ void task2_led() {
 	//ADC_read_DMA_mode();
 }
 
+// задача по опросу клавиатуры и выполнению команд
 void task3_KB() {
-//	Keyboard_test(Keyboard_read());
 	uint16_t kb = Keyboard_read();
 	Keyboard_test(kb);
 	if (kb & KB_LEFT)  {
@@ -867,7 +868,7 @@ void task5_MT6701() {
 #endif
 }
 
-// BMP280
+// Задача по опросу BMP280 и ATH25 и выводу результатов в терминал и на LCD
 void task6_BMP280() {
 #ifdef INC_BMP280_H_
 	float temperature, pressure;
@@ -964,7 +965,7 @@ void OS_init() {
 	taskAdd(&task5_MT6701, 200); // опрос магнитного энкодера MT6701
 #endif
 #ifdef INC_BMP280_H_
-	t_BMP280 = taskAdd(&task6_BMP280, 3000); // опрос магнитного энкодера MT6701
+	t_BMP280 = taskAdd(&task6_BMP280, 3000); // опрос BMP280
 #endif
 //#ifdef INC_ATH25_H_
 //	taskAdd(&task7_ATH25, 3000);

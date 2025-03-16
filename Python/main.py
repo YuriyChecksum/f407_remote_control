@@ -97,7 +97,7 @@ class BMP280:
 
             # K_IIR = 0.02
             pressureIIR = pressure * (
-                        1 - cls.K_IIR) + cls.last_pressureIIR * cls.K_IIR  # IIR ФНЧ val = val*(1-K) + res*K; K = 0.02
+                    1 - cls.K_IIR) + cls.last_pressureIIR * cls.K_IIR  # IIR ФНЧ val = val*(1-K) + res*K; K = 0.02
             cls.last_pressureIIR = pressureIIR
 
             # sTime = time.strftime('%X', time.localtime()) # '%Y.%m.%d %X'  f'{time.monotonic():11.3f}'

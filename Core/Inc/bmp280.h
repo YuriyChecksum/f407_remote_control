@@ -195,7 +195,6 @@ void readSensorConfig(const SensorConfig *config);
 // ctrl_meas 0xF4 = osrs_t[2:0] | osrs_p[2:0] | mode[1:0]          |
 // config    0xF5 = t_sb[2:0]   | filter[2:0] | [0r] | spi3w_en[0] |
 
-// Функция инициализации структуры
 void initSensorConfig(SensorConfig *config, uint8_t osrs_t, uint8_t osrs_p, uint8_t mode, uint8_t t_sb, uint8_t filter) {
     config->osrs_t = osrs_t;
     config->osrs_p = osrs_p;
@@ -352,7 +351,7 @@ uint8_t BMP280_Read(uint8_t reg) {
     return value;
 }
 
-// Функция для чтения калибровочных данных
+// Функция для чтения калибровочных данных зашитых на заводе
 void BMP280_Read_Calibration_Data(void) {
     // Чтение данных
     uint8_t calData[24];
