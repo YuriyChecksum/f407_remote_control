@@ -71,6 +71,7 @@ def sleep(t=0):
             log.info("exit in sleep()")
             break
 
+# про закрытие окон: https://ru.stackoverflow.com/questions/1302494/Закрыть-интерактивное-окно-matplotlib-в-jupyter-по-кнопке-прерывания
 def on_press(event):
     """collback на график"""
     log.info('you pressed', event.button, event.xdata, event.ydata)
@@ -82,14 +83,19 @@ def on_close(event):
     isBreak = True
     raise KeyboardInterrupt("Exit on close figure", "KeyboardInterrupt для прерывания loop")
 
-if __name__ == "__main__":
+Meshure = namedtuple('Meshure', ["datetimenow", "T", "P", "Piir", "Pmm", "Hum", "T_ath25"])
+
+def main():
+    global isBreak
     n = 30*60*12    # n=0 - использовать все | n элементов из истории и на графике
     _sleep = 2
     isBreak = False
 
     filename = Path('BMP280_pressure.csv')
+    if not filename.exists():
+        log.warning(f"{filename} not found. Using 'BMP280_pressure_demo.csv'")
+        filename = Path('BMP280_pressure_demo.csv')
 
-    Meshure = namedtuple('Meshure', ["datetimenow", "T", "P", "Piir", "Pmm", "Hum", "T_ath25"])
 
     df_csvdata = load_data_from_csv(filename, n)
 
@@ -161,8 +167,9 @@ if __name__ == "__main__":
 
     plt.tight_layout() # для оптимального размещения элементов
 
+    # Отобразить график динамически перерисовывая его при изменении данных
     try:
-      while True:  # for i in range(10):
+      while True:
         time_start = time.perf_counter()
         _data = load_data_from_csv(filename, n)
         timeload = time.perf_counter() - time_start
@@ -225,4 +232,6 @@ if __name__ == "__main__":
     plt.ioff()  # Отключить интерактивный режим по завершению анимации
     plt.show()  # Нужно, чтобы график не закрывался после завершения анимации
 
-    # про закрытие окон: https://ru.stackoverflow.com/questions/1302494/Закрыть-интерактивное-окно-matplotlib-в-jupyter-по-кнопке-прерывания
+
+if __name__ == "__main__":
+    main()
