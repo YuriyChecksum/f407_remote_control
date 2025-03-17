@@ -20,6 +20,7 @@ log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
 log.info("Starting app...")
 
+
 class AbcDataLoader(ABC):
     "Получение данных из источника"
 
@@ -60,7 +61,7 @@ class DataCSV(AbcDataLoader):
         return self.data
 
     def get_last(self):
-        return self.data[-1:]
+        return self.data.iloc[-1]
 
     def get_last_T(self):
         return self.data[-1:]['T'].values[0]
@@ -72,7 +73,6 @@ class DataCSV(AbcDataLoader):
 
         try:
             df = pd.read_csv(filename, names=None, sep=";")
-            # Переименовываем столбцы
             df.columns = ['datetimenow', 'T', 'P', 'Piir', 'Pmm', "Hum", "T_ath25", 'empty']
 
             if n == 0:
@@ -80,7 +80,7 @@ class DataCSV(AbcDataLoader):
 
             # Преобразование типов данных
             # df['datetimenow'] = pd.to_datetime(df['datetimenow'])
-            # df['T']           = df['T'].str.replace(',', '.').astype(float)
+            # df['T'] = df['T'].str.replace(',', '.').astype(float)
 
             data = []
             for _d in df[-n:].itertuples(index=False):
@@ -107,10 +107,85 @@ class DataCSV(AbcDataLoader):
 class DrawChart:
     def __init__(self, data_source: AbcDataLoader):
         self.data_source = data_source
-        self.isBreak = False # флаг для прерывания цикла
+        self.isBreak = False  # флаг для прерывания цикла
         self._sleep = 1
         self.init_chart()
-    
+
+    @abstractmethod
+    def init_chart(self):
+        raise NotImplementedError
+
+    @abstractmethod
+    def update(self):
+        raise NotImplementedError
+
+    def update_full_redraw(self):
+        """Обновление данных на графике через перерисовку всего графика, но будет мерцание"""
+        # Код только для примера!
+        raise NotImplementedError
+        _data = self.data_source.get_updated_data()
+        plt.clf()  # Clear
+        # plt.fill_between(xx, 0, yy, color='lightgrey')
+        plt.plot(_data['T'])
+        self.ax1 = plt.pyplot.axes()
+        self._text(self.format_time(DT.datetime.now()))
+        plt.draw()
+        plt.gcf().canvas.flush_events()
+
+    def loop(self, _sleep: float = 1) -> None:
+        self._sleep = _sleep
+        try:
+            while True:
+                self.update()
+                self.sleep(_sleep)
+        except KeyboardInterrupt as err:  # Exit by Esc or ctrl+C
+            log.info(err)
+        finally:
+            plt.close('all')  # закрыть все активные окна
+        plt.ioff()  # Отключить интерактивный режим по завершению анимации
+        plt.show()  # Нужно, чтобы график не закрывался после завершения анимации
+
+    def sleep(self, t: float = 1):
+        "позволяет быстро прерывать процесс по ctrl+C, не блокируя поток на полное время паузы"
+        t1 = time.time()
+        t2 = 0.1
+        while time.time() - t1 < t:
+            plt.pause(t2)  # не блокирующая график пауза в отличии от time.sleep()
+            if self.isBreak:
+                log.info("Break in sleep() function")
+                break
+
+    def set_window_title(self, title):
+        self.fig.canvas.manager.set_window_title(title)
+
+    def set_hooks(self):
+        """Установка хуков на события графика"""
+
+        def on_close(event):
+            """collback на закрытие графика"""
+            log.info('Closed Figure!')
+            self.isBreak = True
+            # raise KeyboardInterrupt("Exit on close figure")
+            exit(0)
+
+        def on_press(event):
+            """collback на график"""
+            log.info('you pressed', event.button, event.xdata, event.ydata)
+
+        # про закрытие окон в matplotlib: 
+        # https://ru.stackoverflow.com/questions/1302494/Закрыть-интерактивное-окно-matplotlib-в-jupyter-по-кнопке-прерывания
+
+        # self.cid = self.fig.canvas.mpl_connect('button_press_event', self.on_press)
+        # self.fig.canvas.mpl_connect('close_event', on_close)
+
+        # Повесим хук на закрытие окна графика
+        plt.get_current_fig_manager().canvas.mpl_connect('close_event', on_close)
+
+
+class PressureChart(DrawChart):
+    def __init__(self, data_source: AbcDataLoader):
+        super().__init__(data_source)
+
     def init_chart(self):
         # Создание окна и осей для графика
         # self.fig, self.axs = plt.subplots(nrows = 3)  # попроще конструктор
@@ -139,11 +214,10 @@ class DrawChart:
 
         # df_time = pd.DataFrame(data)['datetime'].apply(lambda x: DT.datetime.strptime(x, '%Y.%m.%d %X').astimezone()) # from timestamp
 
-        # log.info(df_csvdata[-3:])
-        self.line_p, = self.ax1.plot([], linewidth=1, linestyle='-', label='T')
-        self.line_p2, = self.ax1.plot([], color='orange', linewidth=1, linestyle='-', label='T_ath25')
-        self.line_d2, = self.ax3.plot([], color='g', linewidth=1, linestyle='-', marker='', label='')
-        self.line_4, = self.ax2.plot([], color='r', linewidth=1, linestyle='-', marker='', label='')
+        self.line1, = self.ax1.plot([], linewidth=1, linestyle='-', label='T')
+        self.line2, = self.ax1.plot([], color='orange', linewidth=1, linestyle='-', label='T_ath25')
+        self.line3, = self.ax2.plot([], color='r', linewidth=1, linestyle='-', marker='', label='')
+        self.line4, = self.ax3.plot([], color='g', linewidth=1, linestyle='-', marker='', label='')
 
         self._text = self.ax1.text(0.001, 1.1, '', transform=self.ax1.transAxes).set_text
 
@@ -162,7 +236,7 @@ class DrawChart:
         self.ax3.grid()
 
         # убрать горизонтальную ось
-        self.ax1.set_xticks([])  
+        self.ax1.set_xticks([])
         self.ax2.set_xticks([])
 
         self.ax3.fmt_xdata = DateFormatter('%Y-%m-%d %H:%M:%S')
@@ -175,45 +249,33 @@ class DrawChart:
 
         plt.tight_layout()  # для оптимального размещения элементов
 
-    def update_(self):
-        """Обновление данных на графике через перерисовку всего графика, но будет мерцание"""
-        _data = self.data_source.get_updated_data()
-        plt.clf() # Clear
-        # plt.fill_between(xx, 0, yy, color='lightgrey')
-        plt.plot(_data['T'])
-        self.ax = plt.pyplot.axes()
-        self._text(self.format_time(DT.datetime.now()))
-        plt.draw()
-        plt.gcf().canvas.flush_events()
-
     def update(self):
         """Обновление данных на графике"""
         time_start = time.perf_counter()
         _data = self.data_source.get_updated_data()
         load_file_time = time.perf_counter() - time_start
-        last = _data[-1:]
+        last = self.data_source.get_last()
 
         self._text(
             self.format_time(DT.datetime.now()) +
             f', load {load_file_time:1.3f} с, count {len(_data)}, pause {self._sleep}c\n'
-            f'{last["T"].values[0]:5.2f} C, {last["T_ath25"].values[0]:5.2f} C, '
-            f'{last.P.values[0]:9.2f} Pa, {last.Pmm.values[0]} mmHg, {last.Hum.values[0]}%'
+            f'{last["T"]:5.2f} C, {last["T_ath25"]:5.2f} C, '
+            f'{last["P"]:9.2f} Pa, {last["Pmm"]} mmHg, {last["Hum"]}%'
         )
         # line.set_ydata(_data['T']) # ошибка, потому что оси не настроенны
 
-        x = np.arange(len(_data)) # линейный ряд для оси Х
+        x = np.arange(len(_data))  # линейный ряд для оси Х
 
         # ["datetimenow", "T", "P", "Piir", "Pmm", "Hum", "T_ath25"]
-        self.line_p.set_data(x, _data['T'])
-        self.line_p2.set_data(x, _data['T_ath25'])
-        self.line_4.set_data(x, _data['Hum'])
-        self.line_d2.set_data(x, _data['Pmm'])
+        self.line1.set_data(x, _data['T'])
+        self.line2.set_data(x, _data['T_ath25'])
+        self.line3.set_data(x, _data['Hum'])
+        self.line4.set_data(x, _data['Pmm'])
 
-        last_v = last['T'].values[0] # не использовать как last.T (транспонирует вместо получения члена)
         self.set_window_title(
-            f'{last_v:5.2f} {last.Pmm.values[0]:5.1f} [{self.format_time(DT.datetime.now())}]')
+            f'{last["T"]:5.2f} {last["Pmm"]:5.1f} [{self.format_time(DT.datetime.now())}]')
 
-        # Установка диапазонов по осям
+        # Установка диапазонов по осям (подбирать по данным)
         # self.ax.set_ylim(min(val) * 0.9, int(max(val) * 1.1))
         # self.ax.set_xlim(0, 4)
 
@@ -228,61 +290,12 @@ class DrawChart:
         self.fig.canvas.draw()
         self.fig.canvas.flush_events()
 
-    def loop(self, _sleep: float = 1) -> None:
-        self._sleep = _sleep
-        try:
-            while True:
-                self.update()
-                self.sleep(_sleep)
-        except KeyboardInterrupt as err:  # Exit by Esc or ctrl+C
-            log.info(err)
-        finally:
-            plt.close('all')  # закрыть все активные окна
-        plt.ioff()  # Отключить интерактивный режим по завершению анимации
-        plt.show()  # Нужно, чтобы график не закрывался после завершения анимации
-
-    def sleep(self, t:float=1):
-        "позволяет быстро прерывать процесс по ctrl+C, не блокируя поток на полное время паузы"
-        t1 = time.time()
-        t2 = 0.1
-        while time.time() - t1 < t:
-            plt.pause(t2)  # не блокирующая график пауза в отличии от time.sleep()
-            if self.isBreak:
-                log.info("Break in sleep() function")
-                break
-
-    def set_window_title(self, title):
-        self.fig.canvas.manager.set_window_title(title)
-
-    def set_hooks(self):
-        """Установка хуков на события графика"""
-        def on_close(event):
-            """collback на закрытие графика"""
-            log.info('Closed Figure!')
-            self.isBreak = True
-            # raise KeyboardInterrupt("Exit on close figure")
-            exit(0)
-
-        def on_press(event):
-            """collback на график"""
-            log.info('you pressed', event.button, event.xdata, event.ydata)
-    
-        # про закрытие окон в matplotlib: 
-        # https://ru.stackoverflow.com/questions/1302494/Закрыть-интерактивное-окно-matplotlib-в-jupyter-по-кнопке-прерывания
-
-        # self.cid = self.fig.canvas.mpl_connect('button_press_event', self.on_press)
-        # self.fig.canvas.mpl_connect('close_event', on_close)
-
-        # Повесим хук на закрытие окна графика
-        plt.get_current_fig_manager().canvas.mpl_connect('close_event', on_close)
-
-
 
 BASE_PATH = Path(__file__).parent
 
 
 def main():
-    N_last = 30 * 60 * 12 # n последних элементов для отображения. = 0 - использовать все
+    N_last = 5000  # n последних элементов для отображения. = 0 - использовать все
     period = 2  # период опроса файла в секундах, либо вешать хук в файловой системе на изменение файла
 
     filename = BASE_PATH.joinpath('BMP280_pressure.csv')
@@ -301,8 +314,9 @@ def main():
         log.error("No data")
         exit(0)
 
-    chart = DrawChart(data_source)
+    chart = PressureChart(data_source)
     chart.loop(period)
+
 
 if __name__ == "__main__":
     main()
