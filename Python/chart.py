@@ -132,6 +132,121 @@ class DataCSV(AbstractDataLoader):
             log.info(err)
 
 
+class DrowChart:
+    def __init__(self, data_source: AbstractDataLoader):
+        self.data_source = data_source
+        self.fig, self.axs = plt.subplots(3, 1, figsize=(10, 5), sharex=True)
+        self.ax1 = self.axs[0]
+        self.ax2 = self.axs[1]
+        self.ax3 = self.axs[2]
+
+        self.line_p, = self.ax1.plot([], linewidth=1, linestyle='-', label='T')
+        self.line_p2, = self.ax1.plot([], color='orange', linewidth=1, linestyle='-', label='T_ath25')
+        self.line_d2, = self.ax3.plot([], color='g', linewidth=1, linestyle='-', marker='', label='')
+        self.line_4, = self.ax2.plot([], color='r', linewidth=1, linestyle='-', marker='', label='')
+
+        self._text = self.ax1.text(0.001, 1.1, '', transform=self.ax1.transAxes).set_text
+
+    def update(self):
+        data = self.data_source.get_updated_data()
+        x = np.arange(len(data))
+        self.line_p.set_data(x, data['T'])
+        self.line_p2.set_data(x, data['T_ath25'])
+        self.line_4.set_data(x, data['Hum'])
+        self.line_d2.set_data(x, data['Pmm'])
+        self.fig.canvas.draw()
+        self.fig.canvas.flush_events()
+
+    def sleep(t=0):
+        "позволяет быстро прерывать процесс по ctrl+C, не блокируя поток на полное время паузы"
+        t1 = time.time()
+        t2 = 0.1
+        while time.time() - t1 < t:
+            plt.pause(t2)  # не блокирующая график пауза в отличии от time.sleep()
+            if self.isBreak:
+                log.info("exit in sleep()")
+                break
+
+    def on_press(self, event):
+        """collback на график"""
+        log.info('you pressed', event.button, event.xdata, event.ydata)
+
+    def on_close(self, event):
+        """collback на закрытие графика"""
+        log.info('Closed Figure!')
+        self.isBreak = True
+        # raise KeyboardInterrupt("Exit on close figure")
+
+    def loop(self, event):
+        try:
+            while True:
+                self.update(x, v, _data)
+                self.sleep(self.read_sleep)
+        except KeyboardInterrupt as err:  # Exit by Esc or ctrl+C
+            log.info(err)
+        finally:
+            plt.close('all')  # закрыть все активные окна
+        plt.ioff()  # Отключить интерактивный режим по завершению анимации
+        plt.show()  # Нужно, чтобы график не закрывался после завершения анимации
+
+
+"""
+    def close(self):
+        plt.close('all')  # закрыть все активные окна
+    def show(self):
+        plt.show()  # Нужно, чтобы график не закрывался после завершения анимации
+    def set_title(self, title):
+        self.ax1.set_title(title)
+    def set_ylabel(self, ylabel):
+        self.ax1.set_ylabel(ylabel)
+    def grid(self):
+        self.ax1.grid()
+        self.ax2.grid()
+        self.ax3.grid()
+    def set_xticks(self):
+        self.ax1.set_xticks([])  # убрать горизонтальную ось
+        self.ax2.set_xticks([]) # убрать горизонтальную ось
+    def set_xticks(self):
+        self.ax3.fmt_xdata = DateFormatter('%Y-%m-%d %H:%M:%S')
+        self.fig.autofmt_xdate()
+    def set_text(self, text):
+        self._text(text)
+    def relim(self):
+        self.ax1.relim()  # update axes limits
+        self.ax1.autoscale_view(scaley=True)
+        self.ax2.relim()
+        self.ax2.autoscale_view(scaley=True)
+        self.ax3.relim()
+        self.ax3.autoscale_view(scaley=True)
+    def set_window_title(self, title):
+        self.fig.canvas.manager.set_window_title(title)
+    def set_ylim(self, min, max):
+        self.ax1.set_ylim(min, max)
+    def set_xlim(self, min, max):
+        self.ax1.set_xlim(min, max)
+    def set_legend(self, loc='best'):
+        plt.legend(loc=loc)
+    def tight_layout(self):
+        plt.tight_layout()  # для оптимального размещения элементов
+    def ioff(self):
+        plt.ioff()  # Отключить интерактивный режим по завершению анимации
+    def ion(self):
+        plt.ion()  # динамический режим графика
+    def connect(self, event, callback):
+        plt.get_current_fig_manager().canvas.mpl_connect(event, callback)
+    def pause(self, t):
+        plt.pause(t)  # не блокирующая график пауза в отличии от time.sleep()
+    def draw(self):
+        plt.draw()  # перерисовать график
+    def gcf(self):
+        return plt.gcf()    # получить текущую фигуру
+    def canvas(self):
+        return plt.gcf().canvas    # получить текущую фигуру
+    def flush_events(self):
+        plt.gcf().canvas.flush_events()    # получить текущую фигуру        
+"""
+
+
 BASE_PATH = Path(__file__).parent
 
 
