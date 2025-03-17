@@ -135,11 +135,34 @@ class DataCSV(AbstractDataLoader):
 class DrowChart:
     def __init__(self, data_source: AbstractDataLoader):
         self.data_source = data_source
+        # Создание окна и осей для графика
+        # fig, axs = plt.subplots(nrows = 3)  # попроще конструктор
+        # sharex=True - скрывает подписи на Х
         self.fig, self.axs = plt.subplots(3, 1, figsize=(10, 5), sharex=True)
         self.ax1 = self.axs[0]
         self.ax2 = self.axs[1]
         self.ax3 = self.axs[2]
 
+        # fig.set_figheight(2)
+
+        # Горизонтальные линии:
+        # ax.vlines(2, y.min(), y.max(), color = 'r')
+        # ax.hlines(5, -10, 10, color = 'b', linewidth = 3, linestyle = '--')
+
+        # plt.axhline(y=1.2, color = 'b', linewidth = 1, linestyle='--', label='alert levels')
+        # ax.hlines(y=1.2, xmin=0, xmax=n,      color = 'b', linewidth = 1, linestyle='--', label='б\\у)
+
+        # Установка отображаемых интервалов по осям
+        # ax.set_xlim(0, 4)
+        # ax.set_ylim(0, 1500)
+
+        # plt.annotate('General direction', xy = (3.4, 17)) #add annotation
+        # ax.grid()  # сетка
+        # Отобразить график фукнции в начальный момент времени
+
+        # df_time = pd.DataFrame(data)['datetime'].apply(lambda x: DT.datetime.strptime(x, '%Y.%m.%d %X').astimezone()) # from timestamp
+
+        # log.info(df_csvdata[-3:])
         self.line_p, = self.ax1.plot([], linewidth=1, linestyle='-', label='T')
         self.line_p2, = self.ax1.plot([], color='orange', linewidth=1, linestyle='-', label='T_ath25')
         self.line_d2, = self.ax3.plot([], color='g', linewidth=1, linestyle='-', marker='', label='')
@@ -147,6 +170,103 @@ class DrowChart:
 
         self._text = self.ax1.text(0.001, 1.1, '', transform=self.ax1.transAxes).set_text
 
+        ax1.set_title('Temperature (T)')
+        ax1.set_ylabel('T (°C)')
+
+        # ax2.set_title('humidity, %')
+        ax2.set_ylabel('Hum (%)')
+
+        # ax3.set_title('Pressure, mmHg')
+        ax3.set_ylabel('P (mm)')
+
+        # сетка
+        ax1.grid()
+        ax2.grid()
+        ax3.grid()
+
+        ax1.set_xticks([])  # убрать горизонтальную ось
+        ax2.set_xticks([])
+
+        ax3.fmt_xdata = DateFormatter('%Y-%m-%d %H:%M:%S')
+        fig.autofmt_xdate()
+
+        format_time = '{:%H:%M:%S}'.format  # '{:%Y-%m-%d %H:%M:%S}' format_time(DT.datetime.now())
+        # plt.legend(loc='best')
+
+        # Повесим хук на закрытие окна графика
+        # cid = fig.canvas.mpl_connect('button_press_event', on_press)
+        # fig.canvas.mpl_connect('close_event', on_close)
+        plt.get_current_fig_manager().canvas.mpl_connect('close_event', on_close)
+
+        plt.tight_layout()  # для оптимального размещения элементов
+
+        # Отобразить график динамически перерисовывая его при изменении данных
+        try:
+            while True:
+                time_start = time.perf_counter()
+                _data = data_source.get_updated_data()
+                timeload = time.perf_counter() - time_start
+
+                v = _data['T']
+                current = _data['P']
+                currentIIR = _data['Piir']
+                currenthour = _data['Pmm']
+                last = _data[-1:]
+                # не использовать как last.T (транспонирует вместо получения члена)
+                last_V = last['T'].values[0]
+
+                # # способ через перерисовку всего графика, но будет мерцание
+                # plt.clf() # Очистить текущую фигуру
+                # # plt.fill_between(xx, 0, yy, color='lightgrey')
+                # plt.plot(_price)
+                # ax = pyplot.axes()
+                # _text = ax.text(0.5, 0.9, '', transform=ax.transAxes).set_text
+                # _text(format_time(DT.datetime.now()))
+                # plt.draw()
+                # plt.gcf().canvas.flush_events()
+
+                _text(format_time(DT.datetime.now()) +
+                    f', load {timeload:1.3f} с, count {len(_data)}, pause {read_sleep}c\n{last["T"].values[0]:5.2f} C, {last["T_ath25"].values[0]:5.2f} C, {last.P.values[0]:9.2f} Pa, {last.Pmm.values[0]} mmHg, {last.Hum.values[0]}%')
+                # ошибка, потому что оси не настроенны
+                # line.set_ydata(_price)  # Обновить данные на графике
+
+                # Обновить данные на графике
+                x = np.arange(len(_data))
+                line_p.set_data(x, v)
+                line_p2.set_data(x, _data['T_ath25'])
+                line_4.set_data(x, _data['Hum'])
+
+                line_d2.set_data(x, currenthour)
+
+                # линия последнего значения. не знаю как затирать предыдущие
+                # plt.axhline (y=last_price, color = 'r', linewidth = 1, linestyle='dotted')
+
+                fig.canvas.manager.set_window_title(
+                    f'{last_V:5.2f} {last.Pmm.values[0]:5.1f} [{format_time(DT.datetime.now())}]')
+
+                # ax.set_ylim(min(val) * 0.9, int(v.max() * 1.1))
+                # ax.set_xlim(0, 4)
+                ax1.relim()  # update axes limits
+                ax1.autoscale_view(scaley=True)
+
+                ax2.relim()
+                ax2.autoscale_view(scaley=True)
+
+                ax3.relim()
+                ax3.autoscale_view(scaley=True)
+
+                fig.canvas.draw()
+                fig.canvas.flush_events()
+
+                sleep(read_sleep)
+        except KeyboardInterrupt as err:  # Exit by Esc or ctrl+C
+            log.info(err)
+        finally:
+            plt.close('all')  # закрыть все активные окна
+
+        plt.ioff()  # Отключить интерактивный режим по завершению анимации
+        plt.show()  # Нужно, чтобы график не закрывался после завершения анимации
+            
     def update(self):
         data = self.data_source.get_updated_data()
         x = np.arange(len(data))
@@ -188,9 +308,13 @@ class DrowChart:
             plt.close('all')  # закрыть все активные окна
         plt.ioff()  # Отключить интерактивный режим по завершению анимации
         plt.show()  # Нужно, чтобы график не закрывался после завершения анимации
+    
+    def ioff(self):
+        plt.ioff()  # Отключить интерактивный режим по завершению анимации
+    def ion(self):
+        plt.ion()  # динамический режим графика
 
-
-"""
+    #===========================================================================
     def close(self):
         plt.close('all')  # закрыть все активные окна
     def show(self):
@@ -228,10 +352,7 @@ class DrowChart:
         plt.legend(loc=loc)
     def tight_layout(self):
         plt.tight_layout()  # для оптимального размещения элементов
-    def ioff(self):
-        plt.ioff()  # Отключить интерактивный режим по завершению анимации
-    def ion(self):
-        plt.ion()  # динамический режим графика
+
     def connect(self, event, callback):
         plt.get_current_fig_manager().canvas.mpl_connect(event, callback)
     def pause(self, t):
@@ -244,39 +365,11 @@ class DrowChart:
         return plt.gcf().canvas    # получить текущую фигуру
     def flush_events(self):
         plt.gcf().canvas.flush_events()    # получить текущую фигуру        
-"""
 
 
-BASE_PATH = Path(__file__).parent
 
-
-def main():
-    global isBreak
-    isBreak = False
-    # количество n последних элементов из истории для отображения. 
-    # n = 0 - использовать все данные
-    N_last = 30 * 60 * 12
-    read_sleep = 2  # период опроса файла в секундах, либо вешать файловой системы на изменение файла
-
-    filename = BASE_PATH.joinpath('BMP280_pressure.csv')
-    filename_demo = BASE_PATH.joinpath('BMP280_pressure_demo.csv')
-
-    if not filename.exists():
-        log.warning(f"{filename} not found. Using '{filename_demo}'")
-        if not filename_demo.exists():
-            log.error(f"{filename_demo} not found")
-            exit(0)
-        filename = filename_demo
-
-    data_source = DataCSV(filename, N_last)
-
+def drow(data_source: AbstractDataLoader, read_sleep: int = 2) -> None:
     data_df = data_source.get_data()
-
-    if (data_df is None):
-        log.error("No data")
-        exit(0)
-
-    # chart = DrowChart(data_source)
 
     plt.ion()  # динамический режим графика
     # Создание окна и осей для графика
@@ -412,10 +505,35 @@ def main():
     plt.show()  # Нужно, чтобы график не закрывался после завершения анимации
 
 
+BASE_PATH = Path(__file__).parent
+
+
+def main():
+    global isBreak
+    isBreak = False
+    # количество n последних элементов из истории для отображения. 
+    # n = 0 - использовать все данные
+    N_last = 30 * 60 * 12
+    read_sleep = 2  # период опроса файла в секундах, либо вешать файловой системы на изменение файла
+
+    filename = BASE_PATH.joinpath('BMP280_pressure.csv')
+    filename_demo = BASE_PATH.joinpath('BMP280_pressure_demo.csv')
+
+    if not filename.exists():
+        log.warning(f"{filename} not found. Using '{filename_demo}'")
+        if not filename_demo.exists():
+            log.error(f"{filename_demo} not found")
+            exit(0)
+        filename = filename_demo
+
+    data_source = DataCSV(filename, N_last)
+
+    if (data_source.get_data() is None):
+        log.error("No data")
+        exit(0)
+
+    # chart = DrowChart(data_source)
+    drow(data_source, read_sleep)
+
 if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt as err:
-        pass
-    except Exception as err:
-        log.exception(err)
+    main()
